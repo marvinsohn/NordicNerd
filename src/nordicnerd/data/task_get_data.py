@@ -5,7 +5,10 @@ from nordicnerd.data.get_data import build_and_store_athlete_season_index_from_d
 from nordicnerd.config import BLD
 
 @task
-def task_create_dataset_top50_athletes_per_season(produces: Path = BLD / "data" / "top50_2020_2025.json"):
+def task_create_dataset_top50_athletes_per_season(
+    depends_on: Path = Path(__file__).parent / "get_data.py",
+    produces: Path = BLD / "data" / "top50_2020_2025.json",
+):
     """
     Build and store the top 50 athletes per season from MongoDB,
     saving the output as a JSON file.
