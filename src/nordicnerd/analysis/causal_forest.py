@@ -21,6 +21,8 @@ df = pd.read_pickle(
     "BLD/data/race_data_processed.pkl"
 )
 
+print("Test")
+
 # --------------------------------------------------
 # Outcome: miss rate
 # --------------------------------------------------
@@ -34,7 +36,7 @@ df = df[(df["shots"] > 0) & (df["miss_rate"].notna())]
 # Treatment
 # --------------------------------------------------
 
-T = df["is_aggressive_quantile"].astype(int)
+T = df["is_aggressive"].astype(int)
 
 # --------------------------------------------------
 # Covariates (pre-treatment only)
