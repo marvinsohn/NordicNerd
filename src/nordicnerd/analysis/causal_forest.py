@@ -42,16 +42,17 @@ T = df["is_aggressive"].astype(int)
 # Covariates (pre-treatment only)
 # --------------------------------------------------
 
-X = df[
-    [
-        "rank_before_shooting",
-        "time_behind_before_sec",
-        "ski_form_season_z",
-        "ski_form_race_z",
-        "shooting_position",
-        "shooting_number",
-    ]
-]
+X = df[[
+    "ski_form_race_z",
+    "ski_form_season_z",
+    "rank_before_shooting",
+    "time_behind_before",
+    "shooting_position",
+    "air_temp",
+    "snow_temp",
+    "snow_condition"
+]]
+
 
 # --------------------------------------------------
 # Preprocessing
