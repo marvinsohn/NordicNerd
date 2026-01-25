@@ -60,7 +60,7 @@ X = df[[
 
 numeric_features = [
     "rank_before_shooting",
-    "time_behind_before_sec",
+    "time_behind_before,
     "ski_form_season_z",
     "ski_form_race_z",
     "shooting_number",
