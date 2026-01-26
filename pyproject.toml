@@ -11,5 +11,4 @@ dependencies = [
     "pymongo>=4.15.4",
     "pytask>=0.5.8",
     "python-dotenv>=1.2.1",
-    "scikit-learn>=1.7.2",
 ]
