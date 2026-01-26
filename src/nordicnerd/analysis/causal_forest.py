@@ -1,163 +1,98 @@
-# ==================================================
-# Causal ML: Effect of Aggressive Shooting on Miss Rate
-# ==================================================
-
-import pickle
-import numpy as np
 import pandas as pd
-
+import numpy as np
+from pathlib import Path
+import matplotlib.pyplot as plt
+from econml.dml import CausalForestDML
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestRegressor
+from nordicnerd.config import BLD
 
-from econml.dml import CausalForestDML
+# =========================================
+# Pfade
+# =========================================
+DATA_PATH = BLD / "data/race_data_processed.pkl"
 
-# --------------------------------------------------
-# Load processed data
-# --------------------------------------------------
+# =========================================
+# Daten einlesen
+# =========================================
+df = pd.read_pickle(DATA_PATH)
 
-df = pd.read_pickle(
-    "BLD/data/race_data_processed.pkl"
-)
+print("Spalten im DataFrame:", df.columns.tolist())
 
-print("Test")
 
-# --------------------------------------------------
-# Outcome: miss rate
-# --------------------------------------------------
-
-df["miss_rate"] = df["misses"] / df["shots"]
-
-# Drop impossible rows
-df = df[(df["shots"] > 0) & (df["miss_rate"].notna())]
-
-# --------------------------------------------------
-# Treatment
-# --------------------------------------------------
-
+# =========================================
+# Ziel- und Treatment-Variablen
+# =========================================
+Y = df["misses"].astype(float)
 T = df["is_aggressive"].astype(int)
 
-# --------------------------------------------------
-# Covariates (pre-treatment only)
-# --------------------------------------------------
-
-X = df[[
-    "ski_form_race_z",
-    "ski_form_season_z",
-    "rank_before_shooting",
-    "time_behind_before",
-    "shooting_position",
+# =========================================
+# Features auswählen (nur existierende)
+# =========================================
+candidate_X_cols = [
     "air_temp",
     "snow_temp",
-    "snow_condition"
-]]
-
-
-# --------------------------------------------------
-# Preprocessing
-# --------------------------------------------------
-
-numeric_features = [
-    "rank_before_shooting",
-    "time_behind_before",
-    "ski_form_season_z",
     "ski_form_race_z",
+    "ski_form_season_z",
+    "rank_before_shooting",
     "shooting_number",
+    "shooting_position",
+    "time_behind_before"
 ]
 
-categorical_features = ["shooting_position"]
+# Entferne Zeilen mit NaNs in Treatment, Outcome oder Features
+all_needed_cols = ["is_aggressive", "misses"] + candidate_X_cols
+df_clean = df.dropna(subset=all_needed_cols)
+
+Y = df_clean["misses"].astype(float)
+T = df_clean["is_aggressive"].astype(int)
+X = df_clean[candidate_X_cols]
+
+# =========================================
+# Preprocessing: numerische bleiben, kategorische One-Hot
+# =========================================
+categorical_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+numeric_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
 preprocess_X = ColumnTransformer(
     transformers=[
-        ("num", "passthrough", numeric_features),
-        (
-            "cat",
-            OneHotEncoder(drop="first", sparse_output=False),
-            categorical_features,
-        ),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_cols),
+        ("num", "passthrough", numeric_cols)
     ]
 )
 
-# --------------------------------------------------
-# Models for DML
-# --------------------------------------------------
-
-model_y = RandomForestRegressor(
-    n_estimators=300,
-    min_samples_leaf=20,
-    random_state=42,
-    n_jobs=-1,
-)
-
-model_t = RandomForestRegressor(
-    n_estimators=300,
-    min_samples_leaf=20,
-    random_state=42,
-    n_jobs=-1,
-)
-
-# --------------------------------------------------
-# Causal Forest
-# --------------------------------------------------
-
-cf = CausalForestDML(
-    model_y=model_y,
-    model_t=model_t,
-    n_estimators=800,
-    min_samples_leaf=15,
-    max_depth=None,
-    random_state=42,
-    n_jobs=-1,
-)
-
-# --------------------------------------------------
-# Fit
-# --------------------------------------------------
-
 X_proc = preprocess_X.fit_transform(X)
 
-cf.fit(
-    Y=df["miss_rate"].values,
-    T=T.values,
-    X=X_proc,
+# =========================================
+# Causal Forest Modell aufsetzen
+# =========================================
+cf = CausalForestDML(
+    model_t=RandomForestRegressor(n_estimators=100, min_samples_leaf=10, random_state=42),
+    model_y=RandomForestRegressor(n_estimators=100, min_samples_leaf=10, random_state=42),
+    n_estimators=1000,
+    min_samples_leaf=5,
+    random_state=42,
+    verbose=0
 )
 
-# --------------------------------------------------
-# Average Treatment Effect
-# --------------------------------------------------
+# =========================================
+# Modell fitten
+# =========================================
+cf.fit(Y, T, X=X_proc)
 
-ate = cf.ate(X_proc)
-ate_lb, ate_ub = cf.ate_interval(X_proc)
+# =========================================
+# Treatment Effects schätzen
+# =========================================
+te_pred = cf.effect(X_proc)
+print("Estimated treatment effects (first 10):", te_pred[:10])
 
-print("ATE (aggressive shooting → miss rate):")
-print(f"  {ate:.4f}")
-print(f"95% CI: [{ate_lb:.4f}, {ate_ub:.4f}]")
-
-# --------------------------------------------------
-# Individual Treatment Effects
-# --------------------------------------------------
-
-df["ite_miss_rate"] = cf.effect(X_proc)
-
-print("\nITE summary:")
-print(df["ite_miss_rate"].describe())
-
-# --------------------------------------------------
-# Save model + results
-# --------------------------------------------------
-
-with open("BLD/models/causal_forest_miss_rate.pkl", "wb") as f:
-    pickle.dump(
-        {
-            "model": cf,
-            "preprocess_X": preprocess_X,
-            "ate": ate,
-            "ate_ci": (ate_lb, ate_ub),
-        },
-        f,
-    )
-
-df[["ite_miss_rate"]].to_pickle(
-    "BLD/data/ite_miss_rate.pkl"
-)
+# =========================================
+# Plot der Treatment Effects
+# =========================================
+plt.figure(figsize=(8, 5))
+plt.hist(te_pred, bins=30, edgecolor='k')
+plt.title("Distribution of Estimated Treatment Effects")
+plt.xlabel("Treatment Effect")
+plt.ylabel("Count")
+plt.show()
