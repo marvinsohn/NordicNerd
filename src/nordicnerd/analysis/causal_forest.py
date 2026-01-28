@@ -18,9 +18,6 @@ DATA_PATH = BLD / "data/race_data_processed.pkl"
 # =========================================
 df = pd.read_pickle(DATA_PATH)
 
-print("Spalten im DataFrame:", df.columns.tolist())
-
-
 # =========================================
 # Ziel- und Treatment-Variablen
 # =========================================
@@ -84,15 +81,22 @@ cf.fit(Y, T, X=X_proc)
 # =========================================
 # Treatment Effects schätzen
 # =========================================
-te_pred = cf.effect(X_proc)
-print("Estimated treatment effects (first 10):", te_pred[:10])
+te = cf.effect(X_proc)
+print("Estimated treatment effects (first 10):", te[:10])
 
 # =========================================
-# Plot der Treatment Effects
+# Numerische Summary
 # =========================================
-plt.figure(figsize=(8, 5))
-plt.hist(te_pred, bins=30, edgecolor='k')
-plt.title("Distribution of Estimated Treatment Effects")
-plt.xlabel("Treatment Effect")
-plt.ylabel("Count")
+print("ATE (mean TE):", te.mean())
+print("Std of TE:", te.std())
+print("5%, 50%, 95% quantiles:", np.quantile(te, [0.05, 0.5, 0.95]))
+
+# =========================================
+# Heterogenität: Verteilung der Effekte
+# =========================================
+plt.hist(te, bins=40)
+plt.xlabel("Individual Treatment Effect")
+plt.ylabel("Frequency")
+plt.title("Distribution of Treatment Effects")
+plt.tight_layout()
 plt.show()
