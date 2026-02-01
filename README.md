@@ -49,24 +49,39 @@ The model is trained on preprocessed numerical and one-hot encoded features, wit
 
 ---
 
-## Results
+## Results I — Average Treatment Effect (ATE)
 
-The estimated treatment effects indicate that aggressive shooting is, on average, associated with **more missed shots**, though substantial heterogeneity exists.
+The first step of the analysis examines the **average causal effect** of aggressive shooting behavior across all observed athletes and race situations.
 
 **Summary statistics**
 - Average Treatment Effect (ATE): **−0.19 misses**
 - Standard deviation of treatment effects: **0.16**
 - 5% / 50% / 95% quantiles: **[−0.47, −0.17, 0.04]**
 
-These results suggest that aggressive shooting is generally harmful for accuracy, but not uniformly so across all situations and athletes.
+The negative ATE indicates that, on average, aggressive shooting is associated with **fewer missed shots** compared to non-aggressive shooting strategies.
+
+### Implications (ATE)
+
+At the aggregate level, the results suggest that aggressive shooting does not harm accuracy on average and may even improve shooting performance.  
+However, the substantial spread of estimated effects suggests that this average masks meaningful variation across athletes and race contexts.
+
+*Personal note: The negative average treatment effect suggests that, in some situations, shooting more aggressively may actually be beneficial for accuracy. This resonates with examples of athletes appearing to be completely “in the zone”, such as Jacquelin during the 2021 World Championship pursuit or Wierer in the 2020 Antholz World Championship relay (although these performances are not part of the underlying dataset).*
+
+*Interestingly, this contrasts with the common behavior in the individual race format, where many athletes deliberately slow down their shooting due to the one-minute penalty time. The estimated ATE points in a different direction: on average, slowing down does not appear to improve accuracy, and in some cases, allowing well-trained shooting automatisms to take over may even be advantageous.*
 
 ---
 
-## Interpretation
+## Results II — Heterogeneous Treatment Effects (Exploratory)
 
-The results support the hypothesis that shooting faster increases the risk of misses on average, while also highlighting that the effect depends strongly on context and athlete characteristics.
+Beyond the average effect, the causal forest model estimates **individual treatment effects**, allowing the impact of aggressive shooting to vary across observations.
 
-This underlines the importance of moving beyond average effects when analyzing strategic decisions in elite sports.
+The distribution of estimated effects exhibits substantial heterogeneity, with some observations showing strong improvements under aggressive shooting, while others display near-zero or slightly adverse effects.
+
+### Implications (Heterogeneity)
+
+These findings indicate that aggressive shooting is **not uniformly optimal**. Instead, its effectiveness appears to depend on athlete-specific and contextual factors.
+
+While the present analysis establishes the existence of heterogeneity, identifying and interpreting specific subgroups requires further structured analysis.
 
 ---
 
@@ -74,20 +89,18 @@ This underlines the importance of moving beyond average effects when analyzing s
 
 - Observational data cannot fully rule out unobserved confounding
 - Treatment definition relies on relative shooting time thresholds
-- No athlete-specific fixed effects are explicitly modeled
-- Results are sensitive to feature selection and preprocessing choices
+- Athlete-specific fixed effects are not explicitly modeled
+- Heterogeneous effects are estimated but not yet formally decomposed
 
 ---
 
 ## Next Steps
 
-- Explore alternative treatment definitions (continuous or athlete-relative)
-- Add formal uncertainty estimates for individual effects
-- Investigate subgroup effects (e.g. by experience or race type)
-- Compare causal forest results with simpler causal baselines
+- Systematically analyze conditional average treatment effects (CATEs)
+- Explore subgroup effects by athlete characteristics and race context
+- Consider alternative treatment definitions (continuous or athlete-relative)
+- Add uncertainty quantification for individual and subgroup effects
+- Compare causal forest estimates with simpler causal baselines
 
 ---
 
-## Project Status
-
-This project is part of an ongoing research-oriented exploration of causal machine learning methods applied to elite sports performance data.
