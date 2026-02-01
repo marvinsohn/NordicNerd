@@ -73,15 +73,47 @@ However, the substantial spread of estimated effects suggests that this average 
 
 ## Results II — Heterogeneous Treatment Effects (Exploratory)
 
-Beyond the average effect, the causal forest model estimates **individual treatment effects**, allowing the impact of aggressive shooting to vary across observations.
+Conditional average treatment analysis (CATE) analysis reveals that the effect of aggressive shooting varies across different race situations and athlete characteristics.
 
-The distribution of estimated effects exhibits substantial heterogeneity, with some observations showing strong improvements under aggressive shooting, while others display near-zero or slightly adverse effects.
+**CATE by time behind leader**
+| time_behind_bin | mean   | std    | count |
+|-----------------|--------|--------|-------|
+| low             | -0.124 | 0.147  | 8768  |
+| mid-low         | -0.125 | 0.145  | 8774  |
+| mid-high        | -0.214 | 0.134  | 8759  |
+| high            | -0.292 | 0.139  | 8766  |
+
+**CATE by season form**
+| form_bin | mean   | std    | count |
+|----------|--------|--------|-------|
+| low form | -0.210 | 0.167  | 11708 |
+| mid form | -0.182 | 0.154  | 11672 |
+| high form| -0.174 | 0.148  | 11687 |
+
+**CATE by rank before shooting**
+| rank_bin   | mean   | std    | count |
+|------------|--------|--------|-------|
+| front pack | -0.129 | 0.121  | 8818  |
+| upper mid  | -0.173 | 0.150  | 8808  |
+| lower mid  | -0.196 | 0.160  | 8784  |
+| back pack  | -0.259 | 0.168  | 8657  |
+
+**CATE by shooting number**
+| shooting_number | mean   | std    | count |
+|-----------------|--------|--------|-------|
+| 1               | -0.113 | 0.146  | 14021 |
+| 2               | -0.230 | 0.147  | 14000 |
+| 3               | -0.241 | 0.129  | 3529  |
+| 4               | -0.273 | 0.144  | 3517  |
 
 ### Implications (Heterogeneity)
 
-These findings indicate that aggressive shooting is **not uniformly optimal**. Instead, its effectiveness appears to depend on athlete-specific and contextual factors.
+- Athletes who are further behind the leader benefit more from aggressive shooting, suggesting it may help them recover time without substantially increasing misses.  
+- Less experienced or lower-performing athletes (low season form) see a stronger positive effect of aggressive shooting, potentially because they rely more on automatisms when shooting faster.  
+- Athletes in the back of the pack (rank_before_shooting) benefit more from shooting aggressively, likely as a catch-up strategy.  
+- Later shooting bouts (3rd and 4th) show larger effects of aggressiveness, which may reflect accumulated pressure or fatigue during the race.  
 
-While the present analysis establishes the existence of heterogeneity, identifying and interpreting specific subgroups requires further structured analysis.
+These heterogeneous effects highlight that **the optimal shooting strategy is context-dependent**, supporting the use of causal forests to uncover nuanced decision rules in elite sports.
 
 ---
 

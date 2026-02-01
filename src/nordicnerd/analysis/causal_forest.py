@@ -81,22 +81,95 @@ cf.fit(Y, T, X=X_proc)
 # =========================================
 # Treatment Effects schätzen
 # =========================================
-te = cf.effect(X_proc)
-print("Estimated treatment effects (first 10):", te[:10])
+te_pred = cf.effect(X_proc)
+print("Estimated treatment effects (first 10):", te_pred[:10])
 
 # =========================================
 # Numerische Summary
 # =========================================
-print("ATE (mean TE):", te.mean())
-print("Std of TE:", te.std())
-print("5%, 50%, 95% quantiles:", np.quantile(te, [0.05, 0.5, 0.95]))
+print("ATE (mean TE):", te_pred.mean())
+print("Std of TE:", te_pred.std())
+print("5%, 50%, 95% quantiles:", np.quantile(te_pred, [0.05, 0.5, 0.95]))
 
 # =========================================
 # Heterogenität: Verteilung der Effekte
 # =========================================
-plt.hist(te, bins=40)
+plt.hist(te_pred, bins=40)
 plt.xlabel("Individual Treatment Effect")
 plt.ylabel("Frequency")
 plt.title("Distribution of Treatment Effects")
 plt.tight_layout()
-plt.show()
+#plt.show()
+
+# =========================================
+# CATE preparation
+# =========================================
+df_cate = df.loc[X.index].copy()
+df_cate["ite"] = te_pred
+
+df_cate["time_behind_bin"] = pd.qcut(
+    df_cate["time_behind_before"],
+    q=4,
+    labels=["low", "mid-low", "mid-high", "high"]
+)
+
+cate_time_behind = (
+    df_cate
+    .groupby("time_behind_bin")["ite"]
+    .agg(["mean", "std", "count"])
+)
+
+print("\nCATE by time behind leader:")
+print(cate_time_behind)
+
+cate_time_behind.to_csv(
+    BLD / "results" / "cate_time_behind.csv"
+)
+
+df_cate["form_bin"] = pd.qcut(
+    df_cate["ski_form_season_z"],
+    q=3,
+    labels=["low form", "mid form", "high form"]
+)
+
+cate_form = (
+    df_cate
+    .groupby("form_bin")["ite"]
+    .agg(["mean", "std", "count"])
+)
+
+print("\nCATE by season form:")
+print(cate_form)
+
+cate_form.to_csv(
+    BLD / "results" / "cate_form.csv"
+)
+
+df_cate["rank_bin"] = pd.qcut(
+    df_cate["rank_before_shooting"],
+    q=4,
+    labels=["front pack", "upper mid", "lower mid", "back pack"]
+)
+
+cate_rank = (
+    df_cate
+    .groupby("rank_bin", observed=False)["ite"]
+    .agg(["mean", "std", "count"])
+)
+
+print("\nCATE by rank before shooting:")
+print(cate_rank)
+
+cate_rank.to_csv(BLD / "cate_rank_before_shooting.csv")
+
+cate_shooting_number = (
+    df_cate
+    .groupby("shooting_number", observed=False)["ite"]
+    .agg(["mean", "std", "count"])
+    .sort_index()
+)
+
+print("\nCATE by shooting number:")
+print(cate_shooting_number)
+
+cate_shooting_number.to_csv(BLD / "cate_shooting_number.csv")
