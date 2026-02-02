@@ -1,175 +1,145 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
-import matplotlib.pyplot as plt
 from econml.dml import CausalForestDML
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
-from nordicnerd.config import BLD
 
-# =========================================
-# Pfade
-# =========================================
-DATA_PATH = BLD / "data/race_data_processed.pkl"
 
-# =========================================
-# Daten einlesen
-# =========================================
-df = pd.read_pickle(DATA_PATH)
+def run_causal_forest_analysis(data_path: Path, output_dir: Path):
+    """
+    Runs causal forest estimation and CATE analysis.
+    Saves results to output_dir and returns summary statistics.
+    """
 
-# =========================================
-# Ziel- und Treatment-Variablen
-# =========================================
-Y = df["misses"].astype(float)
-T = df["is_aggressive"].astype(int)
+    # =========================================
+    # Load data
+    # =========================================
+    df = pd.read_pickle(data_path)
 
-# =========================================
-# Features auswählen (nur existierende)
-# =========================================
-candidate_X_cols = [
-    "air_temp",
-    "snow_temp",
-    "ski_form_race_z",
-    "ski_form_season_z",
-    "rank_before_shooting",
-    "shooting_number",
-    "shooting_position",
-    "time_behind_before"
-]
-
-# Entferne Zeilen mit NaNs in Treatment, Outcome oder Features
-all_needed_cols = ["is_aggressive", "misses"] + candidate_X_cols
-df_clean = df.dropna(subset=all_needed_cols)
-
-Y = df_clean["misses"].astype(float)
-T = df_clean["is_aggressive"].astype(int)
-X = df_clean[candidate_X_cols]
-
-# =========================================
-# Preprocessing: numerische bleiben, kategorische One-Hot
-# =========================================
-categorical_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
-numeric_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
-
-preprocess_X = ColumnTransformer(
-    transformers=[
-        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_cols),
-        ("num", "passthrough", numeric_cols)
+    # =========================================
+    # Outcome & treatment
+    # =========================================
+    candidate_X_cols = [
+        "air_temp",
+        "snow_temp",
+        "ski_form_race_z",
+        "ski_form_season_z",
+        "rank_before_shooting",
+        "shooting_number",
+        "shooting_position",
+        "time_behind_before"
     ]
-)
 
-X_proc = preprocess_X.fit_transform(X)
+    all_needed_cols = ["is_aggressive", "misses"] + candidate_X_cols
+    df_clean = df.dropna(subset=all_needed_cols)
 
-# =========================================
-# Causal Forest Modell aufsetzen
-# =========================================
-cf = CausalForestDML(
-    model_t=RandomForestRegressor(n_estimators=100, min_samples_leaf=10, random_state=42),
-    model_y=RandomForestRegressor(n_estimators=100, min_samples_leaf=10, random_state=42),
-    n_estimators=1000,
-    min_samples_leaf=5,
-    random_state=42,
-    verbose=0
-)
+    Y = df_clean["misses"].astype(float)
+    T = df_clean["is_aggressive"].astype(int)
+    X = df_clean[candidate_X_cols]
 
-# =========================================
-# Modell fitten
-# =========================================
-cf.fit(Y, T, X=X_proc)
+    # =========================================
+    # Preprocessing
+    # =========================================
+    categorical_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+    numeric_cols = X.select_dtypes(include=["int64", "float64"]).columns.tolist()
 
-# =========================================
-# Treatment Effects schätzen
-# =========================================
-te_pred = cf.effect(X_proc)
-print("Estimated treatment effects (first 10):", te_pred[:10])
+    preprocess_X = ColumnTransformer(
+        transformers=[
+            ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_cols),
+            ("num", "passthrough", numeric_cols),
+        ]
+    )
 
-# =========================================
-# Numerische Summary
-# =========================================
-print("ATE (mean TE):", te_pred.mean())
-print("Std of TE:", te_pred.std())
-print("5%, 50%, 95% quantiles:", np.quantile(te_pred, [0.05, 0.5, 0.95]))
+    X_proc = preprocess_X.fit_transform(X)
 
-# =========================================
-# Heterogenität: Verteilung der Effekte
-# =========================================
-plt.hist(te_pred, bins=40)
-plt.xlabel("Individual Treatment Effect")
-plt.ylabel("Frequency")
-plt.title("Distribution of Treatment Effects")
-plt.tight_layout()
-#plt.show()
+    # =========================================
+    # Causal Forest
+    # =========================================
+    cf = CausalForestDML(
+        model_t=RandomForestRegressor(
+            n_estimators=100, min_samples_leaf=10, random_state=42
+        ),
+        model_y=RandomForestRegressor(
+            n_estimators=100, min_samples_leaf=10, random_state=42
+        ),
+        n_estimators=1000,
+        min_samples_leaf=5,
+        random_state=42,
+        verbose=0,
+    )
 
-# =========================================
-# CATE preparation
-# =========================================
-df_cate = df.loc[X.index].copy()
-df_cate["ite"] = te_pred
+    cf.fit(Y, T, X=X_proc)
 
-df_cate["time_behind_bin"] = pd.qcut(
-    df_cate["time_behind_before"],
-    q=4,
-    labels=["low", "mid-low", "mid-high", "high"]
-)
+    te_pred = cf.effect(X_proc)
 
-cate_time_behind = (
-    df_cate
-    .groupby("time_behind_bin")["ite"]
-    .agg(["mean", "std", "count"])
-)
+    # =========================================
+    # ATE summary
+    # =========================================
+    ate_summary = {
+        "ate_mean": float(te_pred.mean()),
+        "ate_std": float(te_pred.std()),
+        "q05": float(np.quantile(te_pred, 0.05)),
+        "q50": float(np.quantile(te_pred, 0.50)),
+        "q95": float(np.quantile(te_pred, 0.95)),
+    }
 
-print("\nCATE by time behind leader:")
-print(cate_time_behind)
+    pd.DataFrame([ate_summary]).to_csv(
+        output_dir / "ate_summary.csv", index=False
+    )
 
-cate_time_behind.to_csv(
-    BLD / "results" / "cate_time_behind.csv"
-)
+    # =========================================
+    # CATE preparation
+    # =========================================
+    df_cate = df_clean.copy()
+    df_cate["ite"] = te_pred
 
-df_cate["form_bin"] = pd.qcut(
-    df_cate["ski_form_season_z"],
-    q=3,
-    labels=["low form", "mid form", "high form"]
-)
+    # ---- time behind leader
+    df_cate["time_behind_bin"] = pd.qcut(
+        df_cate["time_behind_before"],
+        q=4,
+        labels=["low", "mid-low", "mid-high", "high"],
+    )
 
-cate_form = (
-    df_cate
-    .groupby("form_bin")["ite"]
-    .agg(["mean", "std", "count"])
-)
+    cate_time = (
+        df_cate.groupby("time_behind_bin", observed=False)["ite"]
+        .agg(["mean", "std", "count"])
+    )
+    cate_time.to_csv(output_dir / "cate_time_behind.csv")
 
-print("\nCATE by season form:")
-print(cate_form)
+    # ---- season form
+    df_cate["form_bin"] = pd.qcut(
+        df_cate["ski_form_season_z"],
+        q=3,
+        labels=["low form", "mid form", "high form"],
+    )
 
-cate_form.to_csv(
-    BLD / "results" / "cate_form.csv"
-)
+    cate_form = (
+        df_cate.groupby("form_bin", observed=False)["ite"]
+        .agg(["mean", "std", "count"])
+    )
+    cate_form.to_csv(output_dir / "cate_form.csv")
 
-df_cate["rank_bin"] = pd.qcut(
-    df_cate["rank_before_shooting"],
-    q=4,
-    labels=["front pack", "upper mid", "lower mid", "back pack"]
-)
+    # ---- rank before shooting
+    df_cate["rank_bin"] = pd.qcut(
+        df_cate["rank_before_shooting"],
+        q=4,
+        labels=["front pack", "upper mid", "lower mid", "back pack"],
+    )
 
-cate_rank = (
-    df_cate
-    .groupby("rank_bin", observed=False)["ite"]
-    .agg(["mean", "std", "count"])
-)
+    cate_rank = (
+        df_cate.groupby("rank_bin", observed=False)["ite"]
+        .agg(["mean", "std", "count"])
+    )
+    cate_rank.to_csv(output_dir / "cate_rank_before_shooting.csv")
 
-print("\nCATE by rank before shooting:")
-print(cate_rank)
+    # ---- shooting number
+    cate_shooting = (
+        df_cate.groupby("shooting_number", observed=False)["ite"]
+        .agg(["mean", "std", "count"])
+        .sort_index()
+    )
+    cate_shooting.to_csv(output_dir / "cate_shooting_number.csv")
 
-cate_rank.to_csv(BLD / "cate_rank_before_shooting.csv")
-
-cate_shooting_number = (
-    df_cate
-    .groupby("shooting_number", observed=False)["ite"]
-    .agg(["mean", "std", "count"])
-    .sort_index()
-)
-
-print("\nCATE by shooting number:")
-print(cate_shooting_number)
-
-cate_shooting_number.to_csv(BLD / "cate_shooting_number.csv")
+    return ate_summary
